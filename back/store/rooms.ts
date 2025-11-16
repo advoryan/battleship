@@ -1,33 +1,51 @@
+import { WebSocket } from 'ws';
 import { MAX_ROOM_PLAYERS } from '../constants.js';
+import type { Room, RoomUser } from '../types.js';
+
+interface RoomSummaryUser {
+  name: string;
+  index: string;
+}
+
+interface RoomSummary {
+  roomId: string;
+  roomUsers: RoomSummaryUser[];
+}
+
+interface RoomCreationResult {
+  room?: Room;
+  error?: string;
+}
+
+interface AddUserResult {
+  room?: Room;
+  isReady?: boolean;
+  error?: string;
+}
 
 export class RoomsStore {
-  constructor() {
-    this.rooms = new Map();
-    this.playerRoom = new Map();
-    this.sequence = 1;
-  }
+  private readonly rooms = new Map<string, Room>();
 
-  createRoom(playerName, ws, playerIndex) {
+  private readonly playerRoom = new Map<string, string>();
+
+  private sequence = 1;
+
+  createRoom(playerName: string, ws: WebSocket, playerIndex: string): RoomCreationResult {
     if (this.playerRoom.has(playerName)) {
       return { error: 'Player already in a room' };
     }
     const roomId = `r-${this.sequence++}`;
-    const room = {
+    const roomUser: RoomUser = { name: playerName, index: playerIndex, ws };
+    const room: Room = {
       id: roomId,
-      roomUsers: [
-        {
-          name: playerName,
-          index: playerIndex,
-          ws,
-        },
-      ],
+      roomUsers: [roomUser],
     };
     this.rooms.set(roomId, room);
     this.playerRoom.set(playerName, roomId);
     return { room };
   }
 
-  getAvailableRooms() {
+  getAvailableRooms(): RoomSummary[] {
     return [...this.rooms.values()]
       .filter((room) => room.roomUsers.length === 1)
       .map((room) => ({
@@ -36,7 +54,7 @@ export class RoomsStore {
       }));
   }
 
-  addUser(roomId, playerName, ws, playerIndex) {
+  addUser(roomId: string, playerName: string, ws: WebSocket, playerIndex: string): AddUserResult {
     const room = this.rooms.get(roomId);
     if (!room) {
       return { error: 'Room not found' };
@@ -49,11 +67,10 @@ export class RoomsStore {
     }
     room.roomUsers.push({ name: playerName, index: playerIndex, ws });
     this.playerRoom.set(playerName, roomId);
-    const isReady = room.roomUsers.length === MAX_ROOM_PLAYERS;
-    return { room, isReady };
+    return { room, isReady: room.roomUsers.length === MAX_ROOM_PLAYERS };
   }
 
-  removeRoom(roomId) {
+  removeRoom(roomId: string): void {
     const room = this.rooms.get(roomId);
     if (!room) {
       return;
@@ -62,18 +79,17 @@ export class RoomsStore {
     this.rooms.delete(roomId);
   }
 
-  removePlayer(playerName) {
+  removePlayer(playerName: string): Room | null {
     const roomId = this.playerRoom.get(playerName);
     if (!roomId) {
       return null;
     }
     const room = this.rooms.get(roomId);
+    this.playerRoom.delete(playerName);
     if (!room) {
-      this.playerRoom.delete(playerName);
       return null;
     }
     room.roomUsers = room.roomUsers.filter((user) => user.name !== playerName);
-    this.playerRoom.delete(playerName);
     if (!room.roomUsers.length) {
       this.rooms.delete(roomId);
       return null;

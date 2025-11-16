@@ -1,14 +1,23 @@
+import { WebSocket } from 'ws';
+import type {
+  PlayerRecord,
+  RegistrationPayload,
+  RegistrationResponse,
+  ScoreboardRow,
+} from '../types.js';
+
 const DEFAULT_WINS = 0;
 
 export class PlayersStore {
-  constructor() {
-    this.players = new Map();
-    this.connections = new Map();
-    this.sockets = new Map();
-    this.indexSequence = 1;
-  }
+  private readonly players = new Map<string, PlayerRecord>();
 
-  register({ name, password }) {
+  private readonly connections = new Map<WebSocket, string>();
+
+  private readonly sockets = new Map<string, WebSocket>();
+
+  private indexSequence = 1;
+
+  register({ name, password }: RegistrationPayload): RegistrationResponse {
     const trimmedName = name?.trim();
     if (!trimmedName || !password) {
       return { error: true, errorText: 'Name and password are required' };
@@ -19,29 +28,27 @@ export class PlayersStore {
       if (existing.password !== password) {
         return { error: true, errorText: 'Invalid password' };
       }
-      return {
-        error: false,
-        player: existing,
-      };
+      return { error: false, player: existing };
     }
 
-    const newPlayer = {
+    const newPlayer: PlayerRecord = {
       name: trimmedName,
       password,
       wins: DEFAULT_WINS,
       index: `p-${this.indexSequence++}`,
     };
+
     this.players.set(trimmedName, newPlayer);
     return { error: false, player: newPlayer };
   }
 
-  attachSocket(ws, playerName) {
+  attachSocket(ws: WebSocket, playerName: string): void {
     this.connections.set(ws, playerName);
     this.sockets.set(playerName, ws);
   }
 
-  detachSocket(ws) {
-    const playerName = this.connections.get(ws);
+  detachSocket(ws: WebSocket): string | null {
+    const playerName = this.connections.get(ws) ?? null;
     if (!playerName) {
       return null;
     }
@@ -53,7 +60,7 @@ export class PlayersStore {
     return playerName;
   }
 
-  getPlayerBySocket(ws) {
+  getPlayerBySocket(ws: WebSocket): PlayerRecord | null {
     const name = this.connections.get(ws);
     if (!name) {
       return null;
@@ -61,23 +68,22 @@ export class PlayersStore {
     return this.players.get(name) ?? null;
   }
 
-  getPlayerByName(name) {
+  getPlayerByName(name: string): PlayerRecord | null {
     return this.players.get(name) ?? null;
   }
 
-  getSocketByName(name) {
-    return this.sockets.get(name) ?? null;
+  getSocketByName(name: string): WebSocket | undefined {
+    return this.sockets.get(name);
   }
 
-  addWin(name) {
+  addWin(name: string): void {
     const player = this.players.get(name);
-    if (!player) {
-      return;
+    if (player) {
+      player.wins += 1;
     }
-    player.wins += 1;
   }
 
-  getScoreboard() {
+  getScoreboard(): ScoreboardRow[] {
     return [...this.players.values()]
       .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name))
       .map(({ name, wins }) => ({ name, wins }));
