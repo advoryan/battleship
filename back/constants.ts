@@ -1,9 +1,10 @@
-const parsePort = (value, fallback) => {
+const parsePort = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
 export const BOARD_SIZE = 10;
+
 export const COMMANDS = {
   REG: 'reg',
   CREATE_ROOM: 'create_room',
@@ -19,11 +20,8 @@ export const COMMANDS = {
   FINISH: 'finish',
   SINGLE_PLAY: 'single_play',
   DISCONNECT: 'diconnect',
-};
+} as const;
 
 export const RESPONSE_ID = 0;
 export const SOCKET_PORT = parsePort(process.env.SOCKET_PORT, 3000);
-
-export const SHIP_TYPES = ['small', 'medium', 'large', 'huge'];
-
 export const MAX_ROOM_PLAYERS = 2;
